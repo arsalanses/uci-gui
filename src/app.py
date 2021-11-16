@@ -11,11 +11,12 @@ import chess.engine
 import chess.pgn
 import io
 import random
-from flask import jsonify
-from flask import Response
+import re
+# from flask import jsonify
+# from flask import Response
 # from flask_pymongo import PyMongo
-from datetime import datetime
-import json
+# from datetime import datetime
+# import json
 
 # create web app instance
 app = Flask(__name__)
@@ -83,11 +84,11 @@ def make_move():
     pgn = request.form.get('pgn')
     
     # probe opening book
-    if probe_book(pgn):
-        return {
-            'score': 'book move',
-            'best_move': probe_book(pgn)
-        }
+    # if probe_book(pgn):
+    #     return {
+    #         'score': 'book move',
+    #         'best_move': probe_book(pgn)
+    #     }
 
     # read game moves from PGN
     game = chess.pgn.read_game(io.StringIO(pgn))    
@@ -101,7 +102,7 @@ def make_move():
         board.push(move)
     
     # create chess engine instance
-    engine = chess.engine.SimpleEngine.popen_uci('./engine/bbc_1.4')
+    engine = chess.engine.SimpleEngine.popen_uci('/home/mint/publiclan/stockfish_14.1_linux_x64/stockfish_14.1_linux_x64') # ./engine/bbc_1.4
     
     # extract fixed depth value
     fixed_depth = request.form.get('fixed_depth')
@@ -146,7 +147,11 @@ def make_move():
         
         # get best score
         try:
-            score = -int(str(info['score'])) / 100
+            # score = -int(str(info['score'])) / 100
+            row_score = str(info['score'])
+            temp = re.findall(r'\d+', row_score)
+            score = int(temp[0]) / 100
+            score *= -1 if 'BLACK' in row_score else 1
         
         except:
             score = str(info['score'])
@@ -173,51 +178,6 @@ def make_move():
             'fen': board.fen(),
             'score': '#+1'
         }
-
-@app.route('/analytics')
-def analytics():
-    return render_template('stats.html')
-
-@app.route('/analytics/api/post', methods=['POST'])
-def post():
-    response = Response('')
-    response.headers['Access-Control-Allow-Origin'] = '*'
-
-    stats = {
-        'Date': request.form.get('date'),
-        'Url': request.form.get('url'),
-        'Agent':request.headers.get('User-Agent')
-    }
-
-    if request.headers.getlist("X-Forwarded-For"):
-       stats['Ip'] = request.headers.getlist("X-Forwarded-For")[0]
-    else:
-       stats['Ip'] = request.remote_addr
-    
-    if request.headers.get('Origin'):
-        stats['Origin'] = request.headers.get('Origin')
-    else:
-        stats['Origin'] = 'N/A'
-    
-    if request.headers.get('Referer'):
-        stats['Referer'] = request.headers.get('Referer')
-    else:
-        stats['Referer'] = 'N/A'
-    
-    with open('stats.json', 'a') as f: f.write(json.dumps(stats, indent=2) + '\n\n')
-    return response
-
-
-@app.route('/analytics/api/get')
-def get():
-    stats = []
-    
-    with open('stats.json') as f:
-        for entry in f.read().split('\n\n'):
-            try: stats.append(json.loads(entry))
-            except: pass
-              
-    return jsonify({'data': stats})
 
 # main driver
 if __name__ == '__main__':
